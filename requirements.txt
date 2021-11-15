@@ -1,0 +1,5 @@
+gspread>=4.0.1
+bmondata>=1.0.6
+requests>=2.25.1
+questionary>=1.10.0
+borb>=2.0.13
