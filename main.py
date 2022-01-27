@@ -6,14 +6,14 @@ from datetime import datetime
 
 from questionary import select, checkbox, Choice
 
-import lib.data_util
-import lib.heat_calcs
+import util.data_util
+import util.heat_calcs
 
 print('ANTHC Heat Recovery Billing Program\n')
 print('Acquiring data...\n')
-cust_recs = lib.data_util.customer_records()
-util_fuel_prices = lib.data_util.utility_fuel_prices()
-akwarm_city_data = lib.data_util.akwarm_city_data()
+cust_recs = util.data_util.customer_records()
+util_fuel_prices = util.data_util.utility_fuel_prices()
+akwarm_city_data = util.data_util.akwarm_city_data()
 
 choices = [
     'Dry Run (no Emails)',
