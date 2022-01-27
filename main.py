@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
+"""Main script to generate and email waste heat bills.
+"""
 from pprint import pprint
+from datetime import datetime
 
 from questionary import select, checkbox, Choice
 
-import data_util
+import lib.data_util
+import lib.heat_calcs
 
 print('ANTHC Heat Recovery Billing Program\n')
 print('Acquiring data...\n')
-cust_recs = data_util.customer_records()
-util_fuel_prices = data_util.utility_fuel_prices()
-akwarm_city_data = data_util.akwarm_city_data()
+cust_recs = lib.data_util.customer_records()
+util_fuel_prices = lib.data_util.utility_fuel_prices()
+akwarm_city_data = lib.data_util.akwarm_city_data()
 
 choices = [
     'Dry Run (no Emails)',
@@ -40,4 +44,24 @@ else:
     ).ask()
     target_cust = [cust_recs[ix] for ix in selected]
 
-pprint(target_cust)
+cur_date = datetime.now()
+
+choices = [
+    'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+    'September', 'October', 'November', 'December'
+]
+def_choice = (cur_date.month - 2) % 12      # default choice is prior month, indexed base 0
+month = select(
+    'Select Month to Bill:',
+    choices=choices,
+    default=choices[def_choice]).ask()
+month = choices.index(month) + 1
+
+choices = [str(cur_date.year), str(cur_date.year - 1), str(cur_date.year - 2)]
+def_choice = 0 if cur_date.month != 1 else 1
+year = select(
+    'Select Year to Bill:',
+    choices=choices,
+    default=choices[def_choice]
+).ask()
+year = int(year)
