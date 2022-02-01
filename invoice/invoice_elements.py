@@ -1,20 +1,16 @@
-# Borb Imports
 from os import path
 from pathlib import Path
 from typing import Text
-import PIL
+from datetime import datetime
+from decimal import Decimal
+
+from PIL import Image as PIL_Image
 from borb.pdf.canvas.color.color import HexColor
 from borb.pdf.canvas.layout.table.fixed_column_width_table import FixedColumnWidthTable as FixedTable
 from borb.pdf.canvas.layout.table.table import Table
 from borb.pdf.canvas.layout.text.paragraph import Paragraph
 from borb.pdf.canvas.layout.layout_element import Alignment
 from borb.pdf.canvas.layout.image.image import Image
-# Other modules
-from datetime import datetime
-from decimal import Decimal
-
-from test_data import one_month_graph
-
 
 def build_title() -> Table:
     table_title = FixedTable(number_of_columns=1, number_of_rows=1)
@@ -61,7 +57,7 @@ def build_invoice_dates(
     #row 3
     table_000.add(Paragraph(' '))
     table_000.add(Paragraph(
-        'Start of Billing Period:', 
+        'Prior Reading Date:', 
         font="Helvetica-Bold", 
         horizontal_alignment=Alignment.RIGHT,
         font_size=11
@@ -75,7 +71,7 @@ def build_invoice_dates(
     # row 4
     table_000.add(Paragraph(' '))
     table_000.add(Paragraph(
-        'End of Billing Period:', 
+        'Current Reading Date:', 
         font="Helvetica-Bold", 
         horizontal_alignment=Alignment.RIGHT,
         font_size=11
@@ -141,80 +137,44 @@ def build_address_information(
     customer: dict,          # name & address info dictionary of customer
     ) -> FixedTable:
 
+    # add a city/state/zip item to dictionary so we can loop through the keys
+    # to add to the document.
+    def make_csz(ent):
+        csz = f"{ent['city']}, {ent['state']} {ent['zip']}".strip()
+        if len(csz) == 1:
+            # there is only a comma, so blank it out
+            csz = ''
+        return csz
 
+    sender['city_st_zip'] = make_csz(sender)
+    customer['city_st_zip'] = make_csz(customer)
 
-    'city' 
-    'state' 
-    'zip' 
-    'phone' 
+    # items to put into the table
+    items = (
+        'contact_name',
+        'organization',
+        'address1',
+        'address2',
+        'city_st_zip',
+        'phone'
+        )
 
-    #  Create table size to match dict size
-    rows_needed = len(customer.keys()) -1
+    #  Create table size to match items to display + blank row at bottom
+    rows_needed = len(items) + 1
     table_001 = FixedTable(number_of_rows=rows_needed, number_of_columns=2)
 	
-    # create contct names
-    table_001.add(Paragraph(
-        text=sender['contact_name'], 
-        font_size=11
-    ))
-    table_001.add(Paragraph(
-        text=customer['contact_name'],
-        font_size=11
-    ))   
-
-    # create organization names
-    table_001.add(Paragraph(
-        text=sender['organization'], 
-        font_size=11
-    ))
-    table_001.add(Paragraph(
-        text=customer['organization'],
-        font_size=11
-    ))   
-
-    # Create address and builidng unit/office titles
-    table_001.add(Paragraph(text=sender['address1'],
-        font_size=11
-    ))
-
-    table_001.add(Paragraph(
-        text=customer['address1'],
-        font_size=11
-    ))   
-
-    table_001.add(Paragraph(
-        text=sender['address2'],
-        font_size=11
-    ))
-    table_001.add(Paragraph(
-        text=customer['address2'],
-        font_size=11
-    ))   
-  
-    # Create city, state zip fomatting
-    table_001.add(Paragraph(
-        text=f"{sender['city']}, {sender['state']} {sender['zip']}" ,
-        font_size=11
-    ))
-    table_001.add(Paragraph(
-        text=f"{customer['city']}, {customer['state']} {customer['zip']}",
-        font_size=11
-    ))   
-
-    # create phone numbers
-    table_001.add(Paragraph(
-        text=sender['phone'], 
-        font_size=11
-    ))
-    table_001.add(Paragraph(
-        text=customer['phone'],
-        font_size=11
-    ))   
-  
+    for item in items:
+        for entity in (sender, customer):
+            item_text = entity[item]
+            if len(item_text) == 0:
+                item_text = ' '     # blank text causes an error
+            table_001.add(Paragraph(
+                text=item_text,
+                font_size=11
+            ))
 
     for i in range(2):
         table_001.add(Paragraph(text=" ", font_size=4))
-
 
     table_001.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(2), Decimal(2))    		
     table_001.no_borders()
@@ -284,49 +244,48 @@ def build_item_descriptions(
     )
 
     # rounding currency values to two decimal places
-    fuel_value = round(fuel_value,2)
-    bill_amt = round(bill_amt,2)
+    fuel_value = round(fuel_value, 2)
+    bill_amt = round(bill_amt, 2)
     # calculating savings
     savings = fuel_value - bill_amt
 
 
     ### Headers and values of invoice Items
     #row 1
-    billing_days = (bill_period_end - bill_period_start).days + 1
+    billing_days = (bill_period_end - bill_period_start).total_seconds()/(3600 * 24)
     items_table.add(Paragraph('Days in Billing Period', font_size=10))
-    items_table.add(Paragraph(str(billing_days), text_alignment=Alignment.CENTERED, font_size=10))
+    items_table.add(Paragraph(f'{billing_days:.1f} days', text_alignment=Alignment.CENTERED, font_size=10))
 
     #row 2
     items_table.add(Paragraph('Gallons Saved', text_alignment=Alignment.LEFT, font_size=10))
-    items_table.add(Paragraph(text=f'{round(gal_saved,1)} gal.', text_alignment=Alignment.CENTERED, 
+    items_table.add(Paragraph(text=f'{gal_saved:,.1f} gallons', text_alignment=Alignment.CENTERED, 
         font_size=10))
 
     # row
     items_table.add(Paragraph('Retail Price per Gallon of Fuel', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
-        text="${:,.2f} / gal.".format(retail_rate_per_gal), 
+        text="${:,.2f} / gallon".format(retail_rate_per_gal), 
         text_alignment=Alignment.CENTERED, 
         font_size=10
     ))
 
     # row
-    items_table.add(Paragraph('Bill Price per Gallon of Fuel', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Billed Price per Gallon of Fuel', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
-        text="${:,.2f} / gal.".format(bill_rate_per_gal), 
+        text="${:,.2f} / gallon".format(bill_rate_per_gal), 
         text_alignment=Alignment.CENTERED, 
         font_size=10
     ))
  
-
     #row 3
     items_table.add(Paragraph('Value of Fuel', text_alignment=Alignment.LEFT, font_size=10))
-    items_table.add(Paragraph(text="${:,.2f}".format(fuel_value), text_alignment=Alignment.CENTERED, 
+    items_table.add(Paragraph(text="${:,.0f}".format(fuel_value), text_alignment=Alignment.CENTERED, 
         font_size=10))
 
     #row 4
-    items_table.add(Paragraph('Fuel Savings', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Fuel Cost Savings from Use of Waste Heat', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
-        text="${:,.2f}".format(savings), 
+        text="${:,.0f}".format(savings), 
         text_alignment=Alignment.CENTERED,
         font_size=10
     ))
@@ -360,15 +319,13 @@ def build_graph_header() -> Table:
 
 
 def build_graph_images(
-    graph_month: PIL, # graph of fuel use during the month, this will be a PIL.Image
-    graph_history: PIL,     # graph of the history of savings, also PIL.Image  
+    graph_month: PIL_Image,       # graph of fuel use during the month, this will be a PIL.Image
+    graph_history: PIL_Image,     # graph of the history of savings, also PIL.Image  
     ) -> Table:
     image_table = FixedTable(number_of_rows=1, number_of_columns=2)
     
-    for pil_img in [graph_month, graph_history]:
-        image_table.add(Image(
-            pil_img
-        ))
+    image_table.add(Image(graph_month))
+    image_table.add(Image(graph_history))
 
     image_table.set_padding_on_all_cells(2,2,2,2)
     return image_table

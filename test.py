@@ -1,4 +1,20 @@
 #!/usr/bin/env python
-from util.heat_calcs import get_sensor_data
+from datetime import datetime
 
-print(get_sensor_data('test-clean_dataset', None, None, None).head())
+from util.heat_calcs import get_btu_data, btus_delivered
+
+""" st = datetime(2021, 5, 1)
+end = datetime(2021, 7, 31)
+
+print(str(st))
+
+df = get_btu_data('test-clean_dataset', None, st, end)
+
+print(df.head())
+print(df.tail())
+ """
+
+df = btus_delivered(3, 2021, 'test-sensor_resets')
+print(df.head())
+print(df.tail())
+print(df.change.sum())

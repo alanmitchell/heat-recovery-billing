@@ -13,7 +13,6 @@ import config
 gc = gspread.service_account(filename=config.spreadsheet_creds_file)
 cust_wb = gc.open_by_key(config.spreadsheet_id)
 
-
 def customer_records():
     """Returns a list of heat recovery customer records from the customer Google Sheet.
     Each record is a dictionary with keys being the column abbreviations.  Any values that
