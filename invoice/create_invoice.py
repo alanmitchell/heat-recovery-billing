@@ -17,6 +17,8 @@ def create_invoice(
     invoice_date: datetime,
     bill_period_start: datetime,
     bill_period_end: datetime,
+    user: str,
+    utility: str,
     sender: dict,
     customer: dict,
     bill_amt:  float,
@@ -42,18 +44,15 @@ def create_invoice(
     # building the elements/building blocks of the complete invoice. 
     # set in order in which they will be added to the page object 
     building_page = [
-        #build_title(), 
-        build_invoice_dates(
-            invoice_date=invoice_date,
+        build_title(), 
+        build_dates(
+            report_date=invoice_date,
             bill_period_start=bill_period_start,
-            bill_period_end=bill_period_end
+            bill_period_end=bill_period_end,
+            user=user,
+            utility=utility
         ), 
         table_spacing(),
-        build_address_header(),
-        build_address_information(
-            sender=sender,
-            customer=customer
-        ),
         build_invoice_amount_due(bill_amt=bill_amt),
         table_spacing(),
         build_items_header(),

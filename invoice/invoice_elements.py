@@ -13,9 +13,17 @@ from borb.pdf.canvas.layout.layout_element import Alignment
 from borb.pdf.canvas.layout.image.image import Image
 
 def build_title() -> Table:
-    table_title = FixedTable(number_of_columns=1, number_of_rows=1)
-    table_title.add(Paragraph("INVOICE", font="Helvetica-Bold", font_size=24, font_color=HexColor("1a1aff"),
-                                text_alignment=Alignment.LEFT))
+    table_title = FixedTable(number_of_columns=2, number_of_rows=1)
+    table_title.add(
+        Image(Path('images/logo.png'), width=Decimal(200), height=Decimal(78))
+    )
+    table_title.add(Paragraph(
+        'Heat Recovery Report', 
+        font_size=18, 
+        font_color=HexColor("1a1aff"), 
+        font="Helvetica-Bold",
+        horizontal_alignment=Alignment.RIGHT,
+    ))
 
     table_title.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(20), Decimal(2))  
     table_title.no_borders()
@@ -23,39 +31,48 @@ def build_title() -> Table:
     return table_title
 
 
-def build_invoice_dates(
-    invoice_date: datetime, # invoice date, Python date/time
+def build_dates(
+    report_date: datetime, # invoice date, Python date/time
     bill_period_start: datetime, # Start of billing period, date/time
     bill_period_end: datetime,   # Start of billing period, date/time
+    user: str,                   # Name of heat user
+    utility: str,                # Name of utility supplying heat
     ) -> Table:
 
     table_000 = FixedTable(
-        number_of_rows=4, 
-        number_of_columns=3, 
-        column_widths=[Decimal(1.6), Decimal(1.65), Decimal(0.95)]
+        number_of_rows=3, 
+        number_of_columns=4, 
+        column_widths=[Decimal(0.6), Decimal(1.0), Decimal(1.65), Decimal(0.95)]
     )
 
     # row 1
-    table_000.add(Paragraph('INVOICE', font_size=18, font_color=HexColor("1a1aff"), font="Helvetica-Bold"))
-    table_000.add(Paragraph(' '))
-    table_000.add(Paragraph(' '))
-
-    # row 2
-    table_000.add(Paragraph(' '))
     table_000.add(Paragraph(
-        'Invoice Date:', 
+        'Heat User:', 
+        font="Helvetica-Bold", 
+        #horizontal_alignment=Alignment.RIGHT, 
+        font_size=11
+    ))
+    table_000.add(Paragraph(user, font_size=11))
+    table_000.add(Paragraph(
+        'Report Date:', 
         font="Helvetica-Bold", 
         horizontal_alignment=Alignment.RIGHT, 
         font_size=11
     ))
     table_000.add(Paragraph(
-        invoice_date.strftime('%B %d, %Y'), 
+        report_date.strftime('%B %d, %Y'), 
         horizontal_alignment=Alignment.RIGHT,
         font_size=11
     ))
 
-    #row 3
-    table_000.add(Paragraph(' '))
+    #row 2
+    table_000.add(Paragraph(
+        'Utility:', 
+        font="Helvetica-Bold", 
+        #horizontal_alignment=Alignment.RIGHT, 
+        font_size=11
+    ))
+    table_000.add(Paragraph(utility, font_size=11))
     table_000.add(Paragraph(
         'Prior Reading Date:', 
         font="Helvetica-Bold", 
@@ -68,7 +85,8 @@ def build_invoice_dates(
         font_size=11
     ))
 
-    # row 4
+    # row 3
+    table_000.add(Paragraph(' '))
     table_000.add(Paragraph(' '))
     table_000.add(Paragraph(
         'Current Reading Date:', 
@@ -103,33 +121,6 @@ def table_spacing() -> Table:
     table_space.no_borders()
 
     return table_space
-
-
-def build_address_header() -> Table:
-    header = FixedTable(
-        number_of_rows=1,
-        number_of_columns=2,
-        background_color=HexColor('cecece')
-    )
-
-    header.add(Paragraph(
-        'Bill From',
-        font="Helvetica-Bold",
-        font_size=11,
-        vertical_alignment=Alignment.TOP
-    ))
-    header.add(Paragraph(
-        'Bill To',
-        font="Helvetica-Bold",
-        font_size=11,
-        vertical_alignment=Alignment.TOP
-    ))
-
-    header.set_padding_on_all_cells(0,1,4,1)
-    header._border_bottom
-    header._border_right
-
-    return header
 
 
 def build_address_information(
@@ -190,7 +181,7 @@ def build_invoice_amount_due(bill_amt: float) -> Table:
     )
     
     amount_table.add(Paragraph(
-        text='Amount Due',  
+        text='Amount to be Billed by Utility',  
         font='Helvetica-Bold',
         font_size=12,
         text_alignment=Alignment.LEFT,
@@ -216,7 +207,7 @@ def build_items_header() -> Table:
     )
 
     header.add(Paragraph(
-        text='Invoice Details',
+        text='Report Details',
         font="Helvetica-Bold",
         font_size=11,
         vertical_alignment=Alignment.TOP,
@@ -253,7 +244,7 @@ def build_item_descriptions(
     ### Headers and values of invoice Items
     #row 1
     billing_days = (bill_period_end - bill_period_start).total_seconds()/(3600 * 24)
-    items_table.add(Paragraph('Days in Billing Period', font_size=10))
+    items_table.add(Paragraph('Days in Reporting Period', font_size=10))
     items_table.add(Paragraph(f'{billing_days:.1f} days', text_alignment=Alignment.CENTERED, font_size=10))
 
     #row 2
@@ -262,7 +253,7 @@ def build_item_descriptions(
         font_size=10))
 
     # row
-    items_table.add(Paragraph('Retail Price per Gallon of Fuel', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Retail Price per Gallon of Heating Oil', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
         text="${:,.2f} / gallon".format(retail_rate_per_gal), 
         text_alignment=Alignment.CENTERED, 
@@ -270,7 +261,7 @@ def build_item_descriptions(
     ))
 
     # row
-    items_table.add(Paragraph('Billed Price per Gallon of Fuel', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Billed Price per Gallon of Heating Oil', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
         text="${:,.2f} / gallon".format(bill_rate_per_gal), 
         text_alignment=Alignment.CENTERED, 
@@ -278,12 +269,12 @@ def build_item_descriptions(
     ))
  
     #row 3
-    items_table.add(Paragraph('Value of Fuel', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Avoided Cost of Heating Oil', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(text="${:,.0f}".format(fuel_value), text_alignment=Alignment.CENTERED, 
         font_size=10))
 
     #row 4
-    items_table.add(Paragraph('Fuel Cost Savings from Use of Waste Heat', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Cost Savings from Use of Recovered Heat', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
         text="${:,.0f}".format(savings), 
         text_alignment=Alignment.CENTERED,
@@ -303,13 +294,13 @@ def build_graph_header() -> Table:
     )
 
     header.add(Paragraph(
-        text='Current Billing Period',
+        text='Daily Savings for Month Reported',
         font="Helvetica-Bold",
         font_size=11,       
     ))
 
     header.add(Paragraph(
-        text='Historical Billing Periods',
+        text='Last 12 Months',
         font="Helvetica-Bold",
         font_size=11,
     ))
@@ -324,8 +315,10 @@ def build_graph_images(
     ) -> Table:
     image_table = FixedTable(number_of_rows=1, number_of_columns=2)
     
-    image_table.add(Image(graph_month))
-    image_table.add(Image(graph_history))
+    im_wid = Decimal(230)
+    im_ht = Decimal(140)
+    image_table.add(Image(graph_month, width=im_wid, height=im_ht))
+    image_table.add(Image(graph_history, width=im_wid, height=im_ht))
 
     image_table.set_padding_on_all_cells(2,2,2,2)
     return image_table

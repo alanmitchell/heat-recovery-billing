@@ -21,14 +21,12 @@ util_fuel_prices = util.data_util.utility_fuel_prices()
 akwarm_city_data, akwarm_lib_version = util.data_util.akwarm_city_data()
 
 choices = [
-    'Dry Run (no Emails)',
-    'Final Run (send Emails)',
+    'Create Invoices',
+    'Email Invoices',
 ]
-run_type = select(
-    'Is this a:',
+task = select(
+    'Choose an Task:',
     choices=choices).ask()
-
-send_emails = (run_type == choices[1])
 
 choices = [
     'All',
@@ -87,12 +85,17 @@ for cust in target_customers:
     print(f"\nProcessing: {cust['city']} - {cust['customer']}")
 
     try:
+        # make a dictionary mapping month number to expected gallon savings
+        expected_gallons = {}
+        for mo in range(1, 13):
+            expected_gallons[mo] =  cust[f'feas_g_{mo:02d}']
+
         # determine BTUs to bill and billing date range for the customer.
-        btu_total, bill_start, bill_end = util.heat_calcs.btus_delivered(
-                    month, year, cust['sensor_id'], cust['btu_mult'])
-        if not np.isnan(btu_total):
-            fn_invoice = invoice_folder / f"{year}-{month:02X} - {cust['city']} - {cust['customer']}.pdf"
-            gal_saved = btu_total / (config.oil_btu_content * config.oil_heating_effic)
+        gal_saved, bill_start, bill_end, mo_graph, hist_graph = util.heat_calcs.gallons_delivered(
+                    month, year, cust['sensor_id'], cust['btu_mult'], expected_gallons)
+
+        if not np.isnan(gal_saved):
+            fn_invoice = invoice_folder / f"{year}-{month:02d} - {cust['city']} - {cust['customer']}.pdf"
             
             # Determine the price per gallon charged by the electric utility
             if not np.isnan(cust['util_fuel_override']):
@@ -138,6 +141,8 @@ for cust in target_customers:
                 datetime.now(),
                 bill_start,
                 bill_end,
+                f"{cust['city']} - {cust['customer']}",
+                cust['utility_name'],
                 sender,
                 customer,
                 gal_saved * billed_price,
@@ -145,10 +150,10 @@ for cust in target_customers:
                 billed_price,
                 cust_price,
                 gal_saved * cust_price,
-                im_test_graph,
-                im_test_graph
+                mo_graph,
+                hist_graph
             )
-            rprint('[green3]Completed!')
+            rprint(f"[green3]Completed: {gal_saved:,.0f} gallons saved")
 
         else:
             rprint("[red]No BTU Meter Data available during this billing period.")
