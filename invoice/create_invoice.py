@@ -19,8 +19,6 @@ def create_invoice(
     bill_period_end: datetime,
     user: str,
     utility: str,
-    sender: dict,
-    customer: dict,
     bill_amt:  float,
     gal_saved: float,              # gallons saved during billing period
     bill_rate_per_gal: float,    # rate charged per gallon of fuel saved 
@@ -70,7 +68,10 @@ def create_invoice(
         build_graph_images(
             graph_month=graph_billing_period, 
             graph_history=graph_historical_period
-        )
+        ),
+        table_spacing(),
+        table_spacing(),
+        build_notes(),
     ]
     
     for element in building_page:

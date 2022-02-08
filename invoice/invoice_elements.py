@@ -13,13 +13,17 @@ from borb.pdf.canvas.layout.layout_element import Alignment
 from borb.pdf.canvas.layout.image.image import Image
 
 def build_title() -> Table:
-    table_title = FixedTable(number_of_columns=2, number_of_rows=1)
+    table_title = FixedTable(
+        number_of_columns=2, 
+        number_of_rows=1,
+        column_widths=[Decimal(3.0), Decimal(2.0)],
+        )
     table_title.add(
         Image(Path('images/logo.png'), width=Decimal(200), height=Decimal(78))
     )
     table_title.add(Paragraph(
-        'Heat Recovery Report', 
-        font_size=18, 
+        'Heat Recovery Savings Report', 
+        font_size=24, 
         font_color=HexColor("1a1aff"), 
         font="Helvetica-Bold",
         horizontal_alignment=Alignment.RIGHT,
@@ -42,12 +46,12 @@ def build_dates(
     table_000 = FixedTable(
         number_of_rows=3, 
         number_of_columns=4, 
-        column_widths=[Decimal(0.6), Decimal(1.0), Decimal(1.65), Decimal(0.95)]
+        column_widths=[Decimal(0.9), Decimal(1.1), Decimal(1.1), Decimal(0.95)]
     )
 
     # row 1
     table_000.add(Paragraph(
-        'Heat User:', 
+        'Building Owner:', 
         font="Helvetica-Bold", 
         #horizontal_alignment=Alignment.RIGHT, 
         font_size=11
@@ -123,55 +127,6 @@ def table_spacing() -> Table:
     return table_space
 
 
-def build_address_information(
-    sender: dict,           # name & address info in a dictionary of the invoice sender
-    customer: dict,          # name & address info dictionary of customer
-    ) -> FixedTable:
-
-    # add a city/state/zip item to dictionary so we can loop through the keys
-    # to add to the document.
-    def make_csz(ent):
-        csz = f"{ent['city']}, {ent['state']} {ent['zip']}".strip()
-        if len(csz) == 1:
-            # there is only a comma, so blank it out
-            csz = ''
-        return csz
-
-    sender['city_st_zip'] = make_csz(sender)
-    customer['city_st_zip'] = make_csz(customer)
-
-    # items to put into the table
-    items = (
-        'contact_name',
-        'organization',
-        'address1',
-        'address2',
-        'city_st_zip',
-        'phone'
-        )
-
-    #  Create table size to match items to display + blank row at bottom
-    rows_needed = len(items) + 1
-    table_001 = FixedTable(number_of_rows=rows_needed, number_of_columns=2)
-	
-    for item in items:
-        for entity in (sender, customer):
-            item_text = entity[item]
-            if len(item_text) == 0:
-                item_text = ' '     # blank text causes an error
-            table_001.add(Paragraph(
-                text=item_text,
-                font_size=11
-            ))
-
-    for i in range(2):
-        table_001.add(Paragraph(text=" ", font_size=4))
-
-    table_001.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(2), Decimal(2))    		
-    table_001.no_borders()
-    return table_001
-
-
 def build_invoice_amount_due(bill_amt: float) -> Table:
     amount_table = FixedTable(
         number_of_rows=1,
@@ -181,7 +136,7 @@ def build_invoice_amount_due(bill_amt: float) -> Table:
     )
     
     amount_table.add(Paragraph(
-        text='Amount to be Billed by Utility',  
+        text='Expected payment to Utility for recovered heat',  
         font='Helvetica-Bold',
         font_size=12,
         text_alignment=Alignment.LEFT,
@@ -248,12 +203,12 @@ def build_item_descriptions(
     items_table.add(Paragraph(f'{billing_days:.1f} days', text_alignment=Alignment.CENTERED, font_size=10))
 
     #row 2
-    items_table.add(Paragraph('Gallons Saved', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Gallons of Heating Oil you Saved', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(text=f'{gal_saved:,.1f} gallons', text_alignment=Alignment.CENTERED, 
         font_size=10))
 
     # row
-    items_table.add(Paragraph('Retail Price per Gallon of Heating Oil', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Price you would normally Pay per Gallon of Heating Oil **', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
         text="${:,.2f} / gallon".format(retail_rate_per_gal), 
         text_alignment=Alignment.CENTERED, 
@@ -261,20 +216,20 @@ def build_item_descriptions(
     ))
 
     # row
-    items_table.add(Paragraph('Billed Price per Gallon of Heating Oil', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Price Paid for Recovered Heat', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
-        text="${:,.2f} / gallon".format(bill_rate_per_gal), 
+        text="${:,.2f} / gallon equivalent".format(bill_rate_per_gal), 
         text_alignment=Alignment.CENTERED, 
         font_size=10
     ))
  
     #row 3
-    items_table.add(Paragraph('Avoided Cost of Heating Oil', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Your Avoided Cost of Heating Oil this month', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(text="${:,.0f}".format(fuel_value), text_alignment=Alignment.CENTERED, 
         font_size=10))
 
     #row 4
-    items_table.add(Paragraph('Cost Savings from Use of Recovered Heat', text_alignment=Alignment.LEFT, font_size=10))
+    items_table.add(Paragraph('Your Cost Savings by using Recovered Heat this month', text_alignment=Alignment.LEFT, font_size=10))
     items_table.add(Paragraph(
         text="${:,.0f}".format(savings), 
         text_alignment=Alignment.CENTERED,
@@ -295,12 +250,14 @@ def build_graph_header() -> Table:
 
     header.add(Paragraph(
         text='Daily Savings for Month Reported',
+        text_alignment=Alignment.CENTERED,
         font="Helvetica-Bold",
         font_size=11,       
     ))
 
     header.add(Paragraph(
         text='Last 12 Months',
+        text_alignment=Alignment.CENTERED,
         font="Helvetica-Bold",
         font_size=11,
     ))
@@ -320,5 +277,22 @@ def build_graph_images(
     image_table.add(Image(graph_month, width=im_wid, height=im_ht))
     image_table.add(Image(graph_history, width=im_wid, height=im_ht))
 
-    image_table.set_padding_on_all_cells(2,2,2,2)
+    image_table.set_padding_on_all_cells(9,3,2,3)
+    image_table.no_borders()
+
     return image_table
+
+def build_notes():
+    notes_table = FixedTable(number_of_rows=3, number_of_columns=1)
+    notes_table.add(Paragraph(
+        text='** From State of Alaska community database.  If this figure is not accurate, email energy@anthc.org with the correct cost per gallon.',
+        font_size=10,
+    ))
+    notes_table.add(Paragraph(text=' '))
+    notes_table.add(Paragraph(
+        text='This monthly report is intended to show you how much heat recovered from the nearby power plant was used to used to heat your building. It will also show your savings if you had to heat your entire building using your boiler or furnace.',
+        font_size=10,
+    ))
+    notes_table.no_borders()
+
+    return notes_table

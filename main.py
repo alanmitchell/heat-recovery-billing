@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Main script to generate and email waste heat bills.
+"""Main script to generate and email heat recovery reports.
 """
 from datetime import datetime
 from pathlib import Path
@@ -14,15 +14,15 @@ import util.data_util
 import util.heat_calcs
 import invoice.create_invoice
 
-print('ANTHC Heat Recovery Billing Program\n')
+print('ANTHC Heat Recovery Reporting Program\n')
 print('Acquiring data...\n')
 cust_recs = util.data_util.customer_records()
 util_fuel_prices = util.data_util.utility_fuel_prices()
 akwarm_city_data, akwarm_lib_version = util.data_util.akwarm_city_data()
 
 choices = [
-    'Create Invoices',
-    'Email Invoices',
+    'Create Reports',
+    'Email Reports',
 ]
 task = select(
     'Choose an Task:',
@@ -42,7 +42,7 @@ else:
     # assemble a list of choices
     choices = [Choice(f"{rec['city']} - {rec['customer']}", ix)  for ix, rec in enumerate(cust_recs)]
     selected = checkbox(
-        'Select Customers to process:',
+        'Use Space Bar to select desired Customers:',
         choices = choices
     ).ask()
     target_customers = [cust_recs[ix] for ix in selected]
@@ -69,15 +69,12 @@ year = select(
 ).ask()
 year = int(year)
 
-# Make sure the output directory for invoices exists.
-invoice_folder = Path(config.invoice_folder)
+# Make sure the output directory for reports exists.
+report_folder = Path(config.report_folder)
 try:
-    invoice_folder.mkdir(parents=True, exist_ok=True)
+    report_folder.mkdir(parents=True, exist_ok=True)
 except:
-    rprint(f"[red]Error creating the Invoice directory specified in the configuration file:[\red]\n{config.invoice_folder}")
-
-# A testing placeholder image for the two graphs.
-im_test_graph = Image.open('test-data/sample-graph.png')
+    rprint(f"[red]Error creating the Report directory specified in the configuration file:[\red]\n{config.report_folder}")
 
 # Loop through the customers to bill
 for cust in target_customers:
@@ -90,12 +87,12 @@ for cust in target_customers:
         for mo in range(1, 13):
             expected_gallons[mo] =  cust[f'feas_g_{mo:02d}']
 
-        # determine BTUs to bill and billing date range for the customer.
+        # determine gallons to bill and billing date range for the customer.
         gal_saved, bill_start, bill_end, mo_graph, hist_graph = util.heat_calcs.gallons_delivered(
                     month, year, cust['sensor_id'], cust['btu_mult'], expected_gallons)
 
         if not np.isnan(gal_saved):
-            fn_invoice = invoice_folder / f"{year}-{month:02d} - {cust['city']} - {cust['customer']}.pdf"
+            fn_report = report_folder / f"{year}-{month:02d} - {cust['city']} - {cust['customer']}.pdf"
             
             # Determine the price per gallon charged by the electric utility
             if not np.isnan(cust['util_fuel_override']):
@@ -116,35 +113,13 @@ for cust in target_customers:
             else:
                 cust_price = akwarm_city_data[cust['akwarm_city']]['Oil1Price'] * (1.0 - cust['cust_fuel_disc'])
              
-            sender = dict(
-                organization = 'Alaska Village Electric Cooperative',
-                contact_name = 'Waste Heat Billing Technician',
-                address1 = '4831 Eagle Street',
-                address2 = '',
-                city = 'Anchorage',
-                state = 'AK',
-                zip = '99503',
-                phone = ''
-            )
-            customer = dict(
-                organization = f"{cust['city']} - {cust['customer']}",
-                contact_name = 'Accounts Payable',
-                address1 = '',
-                address2 = '',
-                city = '',
-                state = '',
-                zip = '',
-                phone = ''
-            )
             invoice.create_invoice.create_invoice(
-                fn_invoice,
+                fn_report,
                 datetime.now(),
                 bill_start,
                 bill_end,
                 f"{cust['city']} - {cust['customer']}",
                 cust['utility_name'],
-                sender,
-                customer,
                 gal_saved * billed_price,
                 gal_saved,
                 billed_price,
@@ -160,6 +135,6 @@ for cust in target_customers:
 
     except BaseException as err:
         rprint(f"[red]Error: {err}")
-        #raise err
+        raise err
 
 print()
