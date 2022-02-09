@@ -14,19 +14,26 @@ import PIL
 
 import config
 
-def get_btu_data(btu_sensor_id, btu_mult, bmon_server_url, start_date, end_date):
-    """Returns a Pandas Dataframe containing the waste heat BTU meter sensor data.
+def get_gallon_data(btu_sensor_id, btu_mult, bmon_server_url, bill_year, bill_month):
+    """Returns two items in a tuple with information on gallons of oil saved 
+    from use of recovered heat:
+    Monthly Summary Pandas Dataframe that gives gallons saved and billing date range info
+       for the requested billing month and the 12 prior months if available.
+    Pandas Series with daily total gallons saved for the requested billing month
+
     'sensor_id' is the BMON Sensor ID of that sensor, expected to be found on the
-    BMON server pointed to by 'bmon_server_url'.  'start_date' and 'end_date'
-    give the date range of the data to return; they are both Python Datetimes.
+    BMON server pointed to by 'bmon_server_url'.  'bill_year' and 'bill_month'
+    identify the current billing month.
     'btu_mult' is a multiplier that converts the sensor value into BTUs.
 
     If 'sensor_id' begins with 'test-' it is considered to be a test sensor, and
     a test dataframe is returned from the 'test-data/' folder of this repository.
-
-    The returned DataFrame has one column with the name 'btus'; the DataFrame
-    index has the timestamps of the readings.
     """
+
+    # get sensor readings a full year prior to start of billing month through readings
+    # a bit into the next month.
+    start_date = datetime(bill_year, bill_month, 1) - timedelta(days=365)
+    end_date = datetime(bill_year, bill_month, 1) + timedelta(days=31)
 
     if btu_sensor_id.startswith('test-'):
         # requesting a test data sensor
@@ -41,7 +48,36 @@ def get_btu_data(btu_sensor_id, btu_mult, bmon_server_url, start_date, end_date)
     df.columns = ['btus']
     df['btus'] *= btu_mult
 
-    return df
+    # Calculate differences in the BTU count so that resets can be handled (by eliminating
+    # negative differences).
+    df['change'] = df.btus.diff()
+    df['change'] = df.change.where(df.change >= 0.0)
+
+    # add a column for fuel oil gallon equivalents
+    df['gallons'] = df.change / (config.oil_btu_content * config.oil_heating_effic)
+
+    # gives a column that gives the timestamp of the prior reading that was involved
+    # in the difference.
+    df['ts'] = pd.to_datetime(df.index).values
+    df['prior_ts'] = df.ts.shift(1)
+
+    # No longer need btus and change columns
+    df.drop(columns=['btus', 'change'], inplace=True)
+
+    # Create a Dataframe with monthly aggregated data
+    df_mo = df.resample('M').agg({'gallons': sum, 'ts': 'max', 'prior_ts': 'min'})
+    # billing days in the month total
+    df_mo['bill_days'] = (df_mo.ts - df_mo.prior_ts).dt.total_seconds() / (3600 * 24)
+    # the difference between the billed number of days and the days in the month
+    df_mo['full_month_err'] = df_mo.bill_days - df_mo.index.days_in_month
+    # trim it back to the billing month and before
+    df_mo = df_mo.query('index < @end_date').copy()
+
+    # Create a Pandas Series that gives daily total gallons for the one month that
+    # is being billed.
+    ser_daily = df[(df.index.year == bill_year) & (df.index.month == bill_month)].resample('D').sum()['gallons']
+
+    return df_mo, ser_daily
 
 def mpl_to_image():
     """Returns the current Matplotlib figure as a PIL image.
@@ -51,7 +87,7 @@ def mpl_to_image():
     buf.seek(0)
     return PIL.Image.open(buf)
 
-def gallons_delivered(bill_month, bill_year, btu_sensor_id, btu_mult, expected_gallons):
+def gallons_delivered(bill_year, bill_month, btu_sensor_id, btu_mult, expected_gallons):
     """Returns BTU billing information for the requested month and BTU meter sensor.
     'bill_month' is the month number (1 - 12) of the month to calculate.  'bill_year' 
     is the year of the billing month (e.g. 2022). 'btu_sensor_id' is the BMON Sensor
@@ -66,58 +102,27 @@ def gallons_delivered(bill_month, bill_year, btu_sensor_id, btu_mult, expected_g
     Returns a tuple:  oil gallons avoided, start of billing period (Python date/time), end of
         billing period (Python datetime).
     """
-    # get sensor readings a full year prior to start of billing month through readings
-    # a bit into the next month.
-    rdg_start = datetime(bill_year, bill_month, 1) - timedelta(days=365)
-    rdg_end = datetime(bill_year, bill_month, 1) + timedelta(days=31)
-
-    df = get_btu_data(btu_sensor_id, btu_mult, config.bmon_url, rdg_start, rdg_end)
-    if len(df) == 0:
+    df_mo, ser_daily = get_gallon_data(btu_sensor_id, btu_mult, config.bmon_url, bill_year, bill_month)
+    if len(ser_daily) == 0:
         return np.nan, None, None, None, None
 
-    # Calculate differences in the BTU count so that resets can be handled (by eliminating
-    # negative differences).
-    df['change'] = df.btus.diff()
-    df['change'] = df.change.where(df.change >= 0.0)
-
-    # add a column for fuel oil gallon equivalents
-    df['gallons'] = df.change / (config.oil_btu_content * config.oil_heating_effic)
-
-    # gives a column that gives the timestamp of the prior reading that was involved
-    # in the difference.
-    df['ts'] = pd.to_datetime(df.index).values
-    df['prior_ts'] = df.ts.shift(1)
-
-    # make columns that hold the month number and year number
-    df['month'] = df.index.month
-    df['year'] = df.index.year
-
-    # now narrow the dataframe to just the billing month.
-    df_mo = df.query('month == @bill_month and year == @bill_year').copy()
-    if len(df_mo) == 0:
-        return np.nan, None, None, None, None
-
-    # drop the rows where this a missing change value, as we need to use the first
-    # row with a real change.
-    df_mo.dropna(subset=['change'], inplace=True)
-
-    gal_total = df_mo.gallons.sum()
-    bill_start = df_mo.iloc[0].prior_ts.to_pydatetime()
-    bill_end = df_mo.index[-1].to_pydatetime()
+    df_billed_month = df_mo[(df_mo.index.year == bill_year) & (df_mo.index.month == bill_month)]
+    ser_billed_month = df_billed_month.iloc[0]
+    gal_total = ser_billed_month.gallons
+    bill_start = ser_billed_month.prior_ts.to_pydatetime()
+    bill_end = ser_billed_month.ts.to_pydatetime()
 
     # Make the graphs
-    #plt.style.use('bmh')
     plt.rcParams['figure.constrained_layout.use'] = True
     plt.rcParams['font.size'] = 10
     
     # gallons avoided by day for the billing month.
     plt.clf()
     plt.figure(figsize=(4.4, 3.0))
-    df_mo.resample('D').sum().gallons.plot()
+    ser_daily.plot()
     plt.ylim(0, None)
     plt.ylabel('gallons saved / day')
     ax = plt.gca()
-    #ax.yaxis.grid()
     ax.xaxis.set_major_formatter(
         mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
     mo_graph_image = mpl_to_image()
@@ -125,25 +130,19 @@ def gallons_delivered(bill_month, bill_year, btu_sensor_id, btu_mult, expected_g
     # historical savings.
     plt.clf()
     plt.figure(figsize=(4.4, 3.0))
-    dfh = df.resample('M').sum()
     # make the x labels, actual gallons saved and expected gallons for graphing.
     xlabels = []
     actual_gal = []
     expected_gal = []
-    bill_mo_str = f'{bill_year}-{bill_month:02d}'
-    for d, row in dfh.iterrows():
-        this_year_mo = f'{d.year}-{d.month:02d}'
-        if this_year_mo <= bill_mo_str:
-            # the test above eliminates the bit of data past the billing month.
-            xlabels.append(f"{d.strftime('%b')} '{d.strftime('%y')}")
-            actual_gal.append(row.gallons)
-            expected_gal.append(expected_gallons[d.month])
+    for d, row in df_mo.iterrows():
+        xlabels.append(f"{d.strftime('%b')} '{d.strftime('%y')}")
+        actual_gal.append(row.gallons)
+        expected_gal.append(expected_gallons[d.month])
 
     plt.bar(xlabels, actual_gal, label='Actual')
     plt.plot(xlabels, expected_gal, 'ro--', label='Expected')
     plt.legend()
     ax = plt.gca()
-    #ax.yaxis.grid()
     for label in ax.get_xticklabels(which='major'):
         label.set(rotation=45, horizontalalignment='right')
     plt.ylim(0, None)

@@ -89,7 +89,7 @@ for cust in target_customers:
 
         # determine gallons to bill and billing date range for the customer.
         gal_saved, bill_start, bill_end, mo_graph, hist_graph = util.heat_calcs.gallons_delivered(
-                    month, year, cust['sensor_id'], cust['btu_mult'], expected_gallons)
+                    year, month, cust['sensor_id'], cust['btu_mult'], expected_gallons)
 
         if not np.isnan(gal_saved):
             fn_report = report_folder / f"{year}-{month:02d} - {cust['city']} - {cust['customer']}.pdf"
