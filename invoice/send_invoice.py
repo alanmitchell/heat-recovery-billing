@@ -1,3 +1,5 @@
+"""Module for creating and sending an email containing the Heat Recovery report.
+"""
 import yagmail
 from datetime import datetime
 
@@ -17,6 +19,8 @@ def main(
     fuel_value: float,
     pdf_file_handle: str,
 ):
+    """Main function to call to create and send an email of the Heat Recovery Report.
+    """
 
     subject = email_subject(
         billing_period_start=billing_period_start,
@@ -44,16 +48,19 @@ def main(
 
 
 ### Functions used to build the email
-# login information for yagmail user class
+
 def make_sender() -> yagmail.sender.SMTP:
+    """Use credentials in the config file to make a yagmail sender.
+    """
     return yagmail.SMTP(user=config.email_user, password=config.email_password)
 
 
-# subject line of email
 def email_subject(
     billing_period_start: datetime,
     billing_period_end: datetime,
 ) -> str:
+    """Return the subject line of the email.
+    """
 
     start = billing_period_start.strftime('%m/%d/%Y')
     end = billing_period_end.strftime('%m/%d/%Y')
@@ -61,7 +68,6 @@ def email_subject(
     return subject
 
 
-# email message body
 def email_contents(
     billing_period_start: datetime,
     billing_period_end: datetime,
@@ -71,6 +77,8 @@ def email_contents(
     retail_rate_per_gal: float,
     fuel_value: float
 ) -> str:
+    """Return the body of the email.
+    """
 
     # additional calculations for the body of the paragraph
     start = billing_period_start.strftime('%m/%d/%Y')
