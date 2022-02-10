@@ -1,11 +1,10 @@
 import yagmail
 from datetime import datetime
 
+import config
+
 
 def main(
-    user_email: str,
-    user_pw: str,
-    email_host: str,
     to_addresses: list,
     to_cc: list,
     to_bcc: list,
@@ -18,16 +17,7 @@ def main(
     fuel_value: float,
     pdf_file_handle: str,
 ):
-    user_info = user_information(
-        user_email=user_email,
-        user_pw=user_pw,
-        email_host=email_host,
-    )
-    recipients = email_recipients(
-        to_addreses=to_addresses,
-        to_cc=to_cc,
-        to_bcc=to_bcc
-    )
+
     subject = email_subject(
         billing_period_start=billing_period_start,
         billing_period_end=billing_period_end
@@ -41,52 +31,36 @@ def main(
         retail_rate_per_gal=retail_rate_per_gal,
         fuel_value=fuel_value
     )
-    attachments = email_attachments(
-        pdf_file_handle=pdf_file_handle
-    )
 
-    send_email(
-        yag_info = user_info,
-        recipients = recipients,
-        subject = subject,
-        contents = contents,
-        attachments = attachments
-    )
-
-    return (
-        print('----------------------------------',end='\n'), 
-        print('         Email Sent', end='\n'), 
-        print('----------------------------------')
+    yag_sender = make_sender()
+    yag_sender.send(
+        to=to_addresses,
+        cc=to_cc,
+        bcc=to_bcc,
+        subject=subject,
+        contents=contents,
+        attachments=pdf_file_handle,
     )
 
 
 ### Functions used to build the email
 # login information for yagmail user class
-def user_information(
-    user_email: str,
-    user_pw: str,
-    email_host: str,
-) -> yagmail:
-    return yagmail.SMTP(user=user_email, password=user_pw, host=email_host)
+def make_sender() -> yagmail.sender.SMTP:
+    return yagmail.SMTP(user=config.email_user, password=config.email_password)
 
-# input of addresses for TO, CC, BCC
-def email_recipients(
-    to_addreses: list,
-    to_cc: list,
-    to_bcc: list,
-) -> dict:
-    return {'To': to_addreses, 'CC': to_cc, 'BCC': to_bcc}
 
 # subject line of email
 def email_subject(
     billing_period_start: datetime,
     billing_period_end: datetime,
 ) -> str:
+
     start = billing_period_start.strftime('%m/%d/%Y')
     end = billing_period_end.strftime('%m/%d/%Y')
-    subject = f"Deering Utility Invoice for {start} - {end}"
+    subject = f"Heat Recovery Report for {start} - {end}"
     return subject
-    
+
+
 # email message body
 def email_contents(
     billing_period_start: datetime,
@@ -97,7 +71,8 @@ def email_contents(
     retail_rate_per_gal: float,
     fuel_value: float
 ) -> str:
-    # addiitional calucaltions for the bod of the paragraph
+
+    # additional calculations for the body of the paragraph
     start = billing_period_start.strftime('%m/%d/%Y')
     end = billing_period_end.strftime('%m/%d/%Y')
     total_days = (billing_period_end - billing_period_start).days + 1
@@ -105,7 +80,7 @@ def email_contents(
     fuel_savings = fuel_value - bill_amt
 
     body = [
-        "This is an official notice of a bill from Deering Electric Utilities.",
+        "Heat Recovery Savings Report",
         "------------------------------------------------------------------------------------------------",
         "- ", #spacing 
         f"""This billing period includes the days from {start} through {end} for a total 
@@ -118,30 +93,6 @@ def email_contents(
         This results in a fuel saving cost of {fuel_savings:,.2f}.""",
         "-" # spacing,
         "-" # spacing,
-        "Attached to this email is the official invoice."
+        "Attached to this email is the report as a PDF."
     ]
     return body
-
-# input of str or list of strings for document attachment
-def email_attachments(
-    pdf_file_handle: str,
-) -> str:
-    return pdf_file_handle
-
-# complies all email fields into yagmail send method
-def send_email(
-    yag_info: yagmail,
-    recipients: dict,
-    subject: str,
-    contents: list,
-    attachments: str
-) -> yagmail:
-    return yag_info.send(
-        to=recipients['To'],
-        cc=recipients['CC'],
-        bcc=recipients['BCC'],
-        subject=subject,
-        contents=contents,
-        attachments=attachments
-    )
-
