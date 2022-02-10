@@ -7,7 +7,6 @@ from pathlib import Path
 from questionary import select, checkbox, Choice
 import numpy as np
 from rich import print as rprint
-from PIL import Image
 
 import config
 import util.data_util

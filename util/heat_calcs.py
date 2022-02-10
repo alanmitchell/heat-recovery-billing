@@ -10,9 +10,14 @@ import numpy as np
 import bmondata
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
-import PIL
+from PIL import Image
 
 import config
+
+# Constant that controls whether a particular month's data is included in the
+# historical Monthly graph.  This is the largest acceptable deviation in 
+# billed days from the actual number of days in the month.
+MAX_BILL_DAY_ERR = 6.0 
 
 def get_gallon_data(btu_sensor_id, btu_mult, bmon_server_url, bill_year, bill_month):
     """Returns two items in a tuple with information on gallons of oil saved 
@@ -75,9 +80,12 @@ def get_gallon_data(btu_sensor_id, btu_mult, bmon_server_url, bill_year, bill_mo
 
     # Create a Pandas Series that gives daily total gallons for the one month that
     # is being billed.
-    ser_daily = df[(df.index.year == bill_year) & (df.index.month == bill_month)].resample('D').sum()['gallons']
+    df_billed_mo = df[(df.index.year == bill_year) & (df.index.month == bill_month)]
+    df_daily = df_billed_mo.resample('D').agg({'gallons': sum, 'ts': 'max', 'prior_ts': 'min'})
+    df_daily['bill_days'] = (df_daily.ts - df_daily.prior_ts).dt.total_seconds() / (3600 * 24)
+    df_daily.drop(columns=['ts', 'prior_ts'], inplace=True)
 
-    return df_mo, ser_daily
+    return df_mo, df_daily
 
 def mpl_to_image():
     """Returns the current Matplotlib figure as a PIL image.
@@ -85,7 +93,7 @@ def mpl_to_image():
     buf = io.BytesIO()
     plt.savefig(buf)
     buf.seek(0)
-    return PIL.Image.open(buf)
+    return Image.open(buf)
 
 def gallons_delivered(bill_year, bill_month, btu_sensor_id, btu_mult, expected_gallons):
     """Returns BTU billing information for the requested month and BTU meter sensor.
@@ -102,51 +110,64 @@ def gallons_delivered(bill_year, bill_month, btu_sensor_id, btu_mult, expected_g
     Returns a tuple:  oil gallons avoided, start of billing period (Python date/time), end of
         billing period (Python datetime).
     """
-    df_mo, ser_daily = get_gallon_data(btu_sensor_id, btu_mult, config.bmon_url, bill_year, bill_month)
-    if len(ser_daily) == 0:
-        return np.nan, None, None, None, None
+    df_mo, df_daily = get_gallon_data(btu_sensor_id, btu_mult, config.bmon_url, bill_year, bill_month)
 
-    df_billed_month = df_mo[(df_mo.index.year == bill_year) & (df_mo.index.month == bill_month)]
-    ser_billed_month = df_billed_month.iloc[0]
-    gal_total = ser_billed_month.gallons
-    bill_start = ser_billed_month.prior_ts.to_pydatetime()
-    bill_end = ser_billed_month.ts.to_pydatetime()
-
-    # Make the graphs
+    # Set general graph properties
     plt.rcParams['figure.constrained_layout.use'] = True
     plt.rcParams['font.size'] = 10
+
+    if len(df_daily) > 0:
+        # pull the summary record for the requested billing month from the monthly
+        # summary dataframe.
+        df_billed_month = df_mo[(df_mo.index.year == bill_year) & (df_mo.index.month == bill_month)]
+        ser_billed_month = df_billed_month.iloc[0]
+        gal_total = ser_billed_month.gallons
+        bill_start = ser_billed_month.prior_ts.to_pydatetime()
+        bill_end = ser_billed_month.ts.to_pydatetime()
     
-    # gallons avoided by day for the billing month.
-    plt.clf()
-    plt.figure(figsize=(4.4, 3.0))
-    ser_daily.plot()
-    plt.ylim(0, None)
-    plt.ylabel('gallons saved / day')
-    ax = plt.gca()
-    ax.xaxis.set_major_formatter(
-        mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
-    mo_graph_image = mpl_to_image()
+        # gallons avoided by day for the billing month.
+        plt.clf()
+        plt.figure(figsize=(4.4, 3.0))
+        df_daily.gallons.plot()
+        plt.ylim(0, None)
+        plt.ylabel('gallons saved / day')
+        ax = plt.gca()
+        ax.xaxis.set_major_formatter(
+            mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+        mo_graph_image = mpl_to_image()
 
-    # historical savings.
-    plt.clf()
-    plt.figure(figsize=(4.4, 3.0))
-    # make the x labels, actual gallons saved and expected gallons for graphing.
-    xlabels = []
-    actual_gal = []
-    expected_gal = []
-    for d, row in df_mo.iterrows():
-        xlabels.append(f"{d.strftime('%b')} '{d.strftime('%y')}")
-        actual_gal.append(row.gallons)
-        expected_gal.append(expected_gallons[d.month])
+    else:
+        # no data for the requested billing month.
+        gal_total = np.nan
+        bill_start = None
+        bill_end = None
+        mo_graph_image = Image.open('images/no-data.png')
 
-    plt.bar(xlabels, actual_gal, label='Actual')
-    plt.plot(xlabels, expected_gal, 'ro--', label='Expected')
-    plt.legend()
-    ax = plt.gca()
-    for label in ax.get_xticklabels(which='major'):
-        label.set(rotation=45, horizontalalignment='right')
-    plt.ylim(0, None)
-    plt.ylabel('gallons saved / month')
-    hist_graph_image = mpl_to_image()
+
+    if len(df_mo) > 0:
+        # There is some historical data.  Make a graph.
+        plt.clf()
+        plt.figure(figsize=(4.4, 3.0))
+        # make the x labels, actual gallons saved and expected gallons for graphing.
+        xlabels = []
+        actual_gal = []
+        expected_gal = []
+        for d, row in df_mo.iterrows():
+            xlabels.append(f"{d.strftime('%b')} '{d.strftime('%y')}")
+            actual_gal.append(row.gallons)
+            expected_gal.append(expected_gallons[d.month])
+
+        plt.bar(xlabels, actual_gal, label='Actual')
+        plt.plot(xlabels, expected_gal, 'ro--', label='Expected')
+        plt.legend()
+        ax = plt.gca()
+        for label in ax.get_xticklabels(which='major'):
+            label.set(rotation=45, horizontalalignment='right')
+        plt.ylim(0, None)
+        plt.ylabel('gallons saved / month')
+        hist_graph_image = mpl_to_image()
+
+    else:
+        hist_graph_image = Image.open('images/no-data.png')
 
     return gal_total, bill_start, bill_end, mo_graph_image, hist_graph_image
