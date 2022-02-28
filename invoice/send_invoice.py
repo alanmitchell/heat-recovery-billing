@@ -6,18 +6,15 @@ from datetime import datetime
 import config
 
 
-def main(
+def send_email(
     to_addresses: list,
     to_cc: list,
     to_bcc: list,
     billing_period_start: datetime,
     billing_period_end: datetime,
-    bill_amt: float,
-    bill_rate_per_gal: float,
     gal_saved: float,
-    retail_rate_per_gal: float,
     fuel_value: float,
-    pdf_file_handle: str,
+    pdf_file_name: str,
 ):
     """Main function to call to create and send an email of the Heat Recovery Report.
     """
@@ -29,10 +26,7 @@ def main(
     contents = email_contents(
         billing_period_start=billing_period_start,
         billing_period_end=billing_period_end,
-        bill_amt=bill_amt,
-        bill_rate_per_gal=bill_rate_per_gal,
         gal_saved=gal_saved,
-        retail_rate_per_gal=retail_rate_per_gal,
         fuel_value=fuel_value
     )
 
@@ -43,7 +37,7 @@ def main(
         bcc=to_bcc,
         subject=subject,
         contents=contents,
-        attachments=pdf_file_handle,
+        attachments=pdf_file_name,
     )
 
 
@@ -71,10 +65,7 @@ def email_subject(
 def email_contents(
     billing_period_start: datetime,
     billing_period_end: datetime,
-    bill_amt: float,
-    bill_rate_per_gal: float,
     gal_saved: float,
-    retail_rate_per_gal: float,
     fuel_value: float
 ) -> str:
     """Return the body of the email.
@@ -83,24 +74,12 @@ def email_contents(
     # additional calculations for the body of the paragraph
     start = billing_period_start.strftime('%m/%d/%Y')
     end = billing_period_end.strftime('%m/%d/%Y')
-    total_days = (billing_period_end - billing_period_start).days + 1
-    gallons_saved = round(gal_saved, 1)
-    fuel_savings = fuel_value - bill_amt
+    total_days = (billing_period_end - billing_period_start).total_seconds() / 3600 / 24
 
     body = [
-        "Heat Recovery Savings Report",
-        "------------------------------------------------------------------------------------------------",
-        "- ", #spacing 
-        f"""This billing period includes the days from {start} through {end} for a total 
-        of {total_days} billing days.""",
-        f"""The amount of waste heat measured equated to {gallons_saved} gallons of fuel. 
-        This fuel is charged at ${bill_rate_per_gal:,.2f}/gallon for a calculated bill amount of 
-        ${bill_amt:,.2f}.""",
-        f"""The retail rate of fuel is at ${retail_rate_per_gal:,.2f}/gallon which 
-        puts the value of the fuel saved from using the excess heat to be ${fuel_value:.2f}. 
-        This results in a fuel saving cost of {fuel_savings:,.2f}.""",
-        "-" # spacing,
-        "-" # spacing,
-        "Attached to this email is the report as a PDF."
+        "<h2>Heat Recovery Savings Report</h2>",
+        "Attached is a report showing the savings you realized from using recovered heat from "
+        f"your electric utility.  The report covers the period {start} through {end} for a total "
+        f"of {total_days:.1f} days. You saved {gal_saved:,.0f} gallons of heating oil worth ${fuel_value:,.0f}.",
     ]
     return body
