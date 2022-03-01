@@ -11,6 +11,7 @@ from rich import print as rprint
 
 import config
 import util.data_util
+from util.data_util import chgnan
 import util.heat_calcs
 import invoice.create_invoice
 import invoice.send_invoice
@@ -43,17 +44,37 @@ def create_report(
 
     if not np.isnan(gal_saved):
         path_report = report_folder / make_report_file_name(customer['customer'], customer['city'], year, month)
+
+        # Get the AkWarm Fuel Price
+        if customer['akwarm_city'] == '':
+            rprint('[purple]You need to select an AkWarm Fuel City.')
+            akwarm_fuel_price = np.nan
+        else:
+            akwarm_fuel_price = akwarm_city_data[customer['akwarm_city']]['Oil1Price']
+            if akwarm_fuel_price is None:
+                akwarm_fuel_price = np.nan
+            if np.isnan(akwarm_fuel_price) and \
+                ((customer['fuel_categ'].lower() == 'other') or np.isnan(customer['cust_fuel_override'])):
+                rprint('[purple]AkWarm Fuel Price is not available for selected AkWarm City.')
         
         # Determine the price per gallon charged by the electric utility
         if not np.isnan(customer['util_fuel_override']):
             util_fuel_price = customer['util_fuel_override']
 
-        elif customer['fuel_categ'] == 'Other':
-            util_fuel_price = akwarm_city_data[customer['akwarm_city']]['Oil1Price'] * (1.0 - customer['util_akw_disc'])
+        elif customer['fuel_categ'].lower() == 'other':
+            if np.isnan(customer['util_akw_disc']):
+                rprint('[purple]You have selected the Other utility fuel price cateogry; you need to enter a Discount off of the AkWarm fuel price.')
+            util_fuel_price = akwarm_fuel_price * (1.0 - customer['util_akw_disc'])
+
+        elif customer['fuel_categ'] == '':
+            rprint('[purple]You need to select a Utility Fuel Price Category if you do not provide an override.')
+            util_fuel_price = np.nan
 
         else:
             util_fuel_price = util_fuel_prices[customer['fuel_categ']]
 
+        if np.isnan(customer['pct_fuel_billed']):
+            rprint('[purple]You must enter a % of Utility Fuel Price that is billed for Waste Heat.')
         billed_price = util_fuel_price * customer['pct_fuel_billed']
 
         # Determine the price of fuel avoided by the waste heat user.
@@ -61,7 +82,7 @@ def create_report(
             cust_price = customer['cust_fuel_override']
         
         else:
-            cust_price = akwarm_city_data[customer['akwarm_city']]['Oil1Price'] * (1.0 - customer['cust_fuel_disc'])
+            cust_price = akwarm_fuel_price * (1.0 - chgnan(customer['cust_fuel_disc'], 0.0))
         
         invoice.create_invoice.create_invoice(
             path_report,

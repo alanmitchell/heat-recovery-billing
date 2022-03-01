@@ -98,3 +98,11 @@ def akwarm_city_data():
         city_data[city.find("Name").text] = fields
 
     return city_data, lib_name
+
+def chgnan(val, nan_substitue):
+    """ Returns 'val' if it is not a NaN, otherwise returns nan_substitute.
+    """
+    if math.isnan(val):
+        return nan_substitue
+    else:
+        return val
