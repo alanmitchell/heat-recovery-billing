@@ -11,7 +11,7 @@ from rich import print as rprint
 
 import config
 import util.data_util
-from util.data_util import chgnan
+from util.data_util import akwarm_city_data, chgnan
 import util.heat_calcs
 import invoice.create_invoice
 import invoice.send_invoice
@@ -116,13 +116,17 @@ def create_report(
 
 if __name__ == '__main__':
 
-    print('ANTHC Heat Recovery Reporting Program\n')
+    rprint('\n[blue]------- ANTHC Heat Recovery Reporting Program -------\n')
+    rprint('[red]Red messages indicate an error that will stop report creation for that customer.')
+    rprint('[purple]Purple messages indicate an error that will cause missing information in the report.')
+    rprint('[green3]A Green message indicates a report was completed.\n')
     print('Acquiring data...\n')
     cust_recs = util.data_util.customer_records()
     util_fuel_prices = util.data_util.utility_fuel_prices()
     akwarm_city_data, akwarm_lib_version = util.data_util.akwarm_city_data()
-
-    #from pprint import pprint; pprint(cust_recs)
+    #from pickle import dump, load
+    #dump( (util_fuel_prices, akwarm_city_data), open('data.pkl', 'wb'))
+    #util_fuel_prices, akwarm_city_data = load(open('data.pkl', 'rb'))
 
     task_choices = [
         'Create Reports',

@@ -283,7 +283,12 @@ def build_graph_images(
     return image_table
 
 def build_notes():
-    notes_table = FixedTable(number_of_rows=3, number_of_columns=1)
+    notes_table = FixedTable(number_of_rows=5, number_of_columns=1)
+    notes_table.add(Paragraph(
+        text='X symbols in the above graphs indicate a period with No Data or a period of abnormal length.',
+        font_size=10,
+    ))
+    notes_table.add(Paragraph(text=' '))
     notes_table.add(Paragraph(
         text='** From State of Alaska community database.  If this figure is not accurate, email energy@anthc.org with the correct cost per gallon.',
         font_size=10,
