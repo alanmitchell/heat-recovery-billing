@@ -42,8 +42,9 @@ def create_report(
     gal_saved, bill_start, bill_end, mo_graph, hist_graph = util.heat_calcs.gallons_delivered(
                 billing_year, billing_month, customer['sensor_id'], customer['btu_mult'], expected_gallons)
 
+    path_report = report_folder / make_report_file_name(customer['customer'], customer['city'], year, month)
+
     if not np.isnan(gal_saved):
-        path_report = report_folder / make_report_file_name(customer['customer'], customer['city'], year, month)
 
         # Get the AkWarm Fuel Price
         if customer['akwarm_city'] == '':
@@ -111,7 +112,18 @@ def create_report(
         rprint(f"[green3]Completed: {gal_saved:,.0f} gallons saved")
 
     else:
-        rprint("[red]No BTU Meter Data available during this billing period.")
+        rprint("[purple]No BTU Meter Data available during this billing period.")
+        invoice.create_invoice.create_no_data_invoice(
+            path_report,    # file to store invoice in
+            billing_year,    # the year being requested, e.g. 2021
+            billing_month,   # the month being requested, e.g. 11
+            datetime.now(),
+            f"{customer['city']} - {customer['customer']}",
+            customer['utility_name'],
+            mo_graph,
+            hist_graph
+        )
+        rprint(f"[green3]Completed report, but no billing data.")
 
 
 if __name__ == '__main__':
@@ -153,7 +165,7 @@ if __name__ == '__main__':
         # assemble a list of choices
         choices = [Choice(f"{rec['city']} - {rec['customer']}", ix)  for ix, rec in enumerate(cust_recs)]
         selected = checkbox(
-            'Use Space Bar to select desired Customers:',
+            'Use Space Bar to select desired Customers (*not* just the Enter key):',
             choices = choices
         ).ask()
         target_customers = [cust_recs[ix] for ix in selected]

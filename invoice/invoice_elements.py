@@ -116,6 +116,83 @@ def build_dates(
     return table_000
 
 
+def build_dates_nodata(
+    report_date: datetime,
+    bill_year: int,
+    bill_month: int,
+    user: str,
+    utility: str,
+    ) -> Table:
+
+    table_000 = FixedTable(
+        number_of_rows=3, 
+        number_of_columns=4, 
+        column_widths=[Decimal(0.9), Decimal(1.1), Decimal(1.1), Decimal(0.95)]
+    )
+
+    # row 1
+    table_000.add(Paragraph(
+        'Building Owner:', 
+        font="Helvetica-Bold", 
+        #horizontal_alignment=Alignment.RIGHT, 
+        font_size=11
+    ))
+    table_000.add(Paragraph(user, font_size=11))
+    table_000.add(Paragraph(
+        'Report Date:', 
+        font="Helvetica-Bold", 
+        horizontal_alignment=Alignment.RIGHT, 
+        font_size=11
+    ))
+    table_000.add(Paragraph(
+        report_date.strftime('%B %d, %Y'), 
+        horizontal_alignment=Alignment.RIGHT,
+        font_size=11
+    ))
+
+    #row 2
+    table_000.add(Paragraph(
+        'Utility:', 
+        font="Helvetica-Bold", 
+        #horizontal_alignment=Alignment.RIGHT, 
+        font_size=11
+    ))
+    table_000.add(Paragraph(utility, font_size=11))
+    table_000.add(Paragraph(
+        'Requested Month:', 
+        font="Helvetica-Bold", 
+        horizontal_alignment=Alignment.RIGHT,
+        font_size=11
+    ))
+    table_000.add(Paragraph(
+        datetime(bill_year, bill_month, 1).strftime('%B %Y'), 
+        horizontal_alignment=Alignment.RIGHT,
+        font_size=11
+    ))
+
+    # row 3
+    table_000.add(Paragraph(' '))
+    table_000.add(Paragraph(' '))
+    table_000.add(Paragraph(
+        '**No Data for Month**', 
+        font="Helvetica-Bold", 
+        horizontal_alignment=Alignment.RIGHT,
+        font_size=11
+    ))
+    table_000.add(Paragraph(' '))
+    
+    # Format cells
+    table_000.set_padding_on_all_cells(
+        padding_top=1, 
+        padding_bottom=3, 
+        padding_left=2, 
+        padding_right=2
+    )
+    table_000.no_borders()
+
+    return table_000
+
+
 def table_spacing() -> Table:
     table_space = FixedTable(number_of_rows=1, number_of_columns=1, background_color=None)
     table_space.add(Paragraph(" ", font_size=7))

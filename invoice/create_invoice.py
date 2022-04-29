@@ -80,3 +80,53 @@ def create_invoice(
     with open(pdf_path, "wb") as pdf_file_handle:
         PDF.dumps(pdf_file_handle, pdf)
 
+def create_no_data_invoice(
+    pdf_path: Path,    # file to store invoice in
+    bill_year: int,    # the year being requested, e.g. 2021
+    bill_month: int,   # the month being requested, e.g. 11
+    invoice_date: datetime,
+    user: str,
+    utility: str,
+    graph_billing_period: Image,
+    graph_historical_period: Image,
+    ):
+
+    # Create document
+    pdf = Document()
+
+    # Add page
+    page = Page()
+    pdf.append_page(page)
+
+    # page object for appending items
+    page_layout = SingleColumnLayout(page)
+    page_layout.vertical_margin = page.get_page_info().get_height() * Decimal(0.02)
+
+    # building the elements/building blocks of the complete invoice. 
+    # set in order in which they will be added to the page object 
+    building_page = [
+        build_title(), 
+        table_spacing(),
+        build_dates_nodata(
+            report_date=invoice_date,
+            bill_year=bill_year,
+            bill_month=bill_month,
+            user=user,
+            utility=utility
+        ),
+        table_spacing(),
+        build_graph_header(),
+        build_graph_images(
+            graph_month=graph_billing_period, 
+            graph_history=graph_historical_period
+        ),
+        table_spacing(),
+        table_spacing(),
+        build_notes(),
+    ]
+    
+    for element in building_page:
+        page_layout.add(element)
+
+    with open(pdf_path, "wb") as pdf_file_handle:
+        PDF.dumps(pdf_file_handle, pdf)
